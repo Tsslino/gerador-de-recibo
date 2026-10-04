@@ -1,0 +1,8 @@
+{
+  "name": "recibo-barato",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "mercadopago": "^2.3.0"
+  }
+}

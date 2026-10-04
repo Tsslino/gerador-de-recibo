@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Gerador de Recibos Profissional - Tassio Lino</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --accent: #38bdf8; --bg: #0f172a; --paper: #ffffff; }
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+        body { background: #1e293b; font-family: 'Inter', sans-serif; display: flex; min-height: 100vh; overflow-x: hidden; }
+
+        .sidebar { width: 360px; background: var(--bg); color: white; padding: 25px; position: fixed; height: 100vh; z-index: 100; border-right: 1px solid #334155; overflow-y: auto; }
+        .sidebar h2 { font-size: 14px; color: var(--accent); text-transform: uppercase; margin-bottom: 20px; letter-spacing: 2px; font-weight: 900; }
+        .mode-selector { display: flex; gap: 5px; margin-bottom: 25px; background: #1e293b; padding: 5px; border-radius: 8px; border: 1px solid #334155; }
+        .mode-btn { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 700; background: transparent; color: #94a3b8; }
+        .mode-btn.active { background: var(--accent); color: #000; }
+        
+        .group { margin-bottom: 12px; }
+        label { display: block; font-size: 9px; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase; font-weight: 800; }
+        input, textarea { width: 100%; background: #1e293b; border: 1px solid #334155; padding: 9px; border-radius: 6px; color: white; font-size: 13px; outline: none; user-select: text; }
+        input:focus, textarea:focus { border-color: var(--accent); }
+        .btn-action { background: var(--accent); color: #000; border: none; padding: 15px; width: 100%; border-radius: 8px; font-weight: 900; cursor: pointer; margin-top: 15px; text-transform: uppercase; transition: 0.2s; }
+        .btn-action:hover { filter: brightness(1.1); }
+
+        .preview-container { flex: 1; margin-left: 360px; padding: 40px; display: flex; justify-content: center; background: #1e293b; position: relative; }
+
+        .a4-page { 
+            background: var(--paper); width: 210mm; height: 297mm; color: #000; padding: 20mm; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5); display: none; position: relative;
+        }
+
+        .watermark-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.03); display: flex; align-items: center; justify-content: center; z-index: 10; pointer-events: none;
+        }
+        .watermark-text {
+            font-size: 45px; font-weight: 900; color: rgba(220, 38, 38, 0.15);
+            transform: rotate(-35deg); text-transform: uppercase; letter-spacing: 5px; text-align: center;
+        }
+
+        #view-simples { flex-direction: column; justify-content: center; }
+
+        .d-box { border: 2px solid #000; margin-bottom: -2px; display: flex; }
+        .d-cell { padding: 12px; border-right: 2px solid #000; flex: 1; }
+        .d-cell:last-child { border-right: none; }
+        .d-label { font-size: 9px; font-weight: 900; text-transform: uppercase; }
+        .d-content { font-size: 13px; font-weight: 700; text-transform: uppercase; }
+        
+        .d-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .d-table th { border: 2px solid #000; padding: 10px; font-size: 10px; background: #f1f5f9; text-transform: uppercase; font-weight: 900; }
+        .d-table td { border-left: 2px solid #000; border-right: 2px solid #000; padding: 12px; font-family: 'IBM Plex Mono'; font-size: 13px; }
+        .d-filler { height: 180px; border-bottom: 2px solid #000; }
+        .d-totals { display: grid; grid-template-columns: repeat(3, 1fr); border: 2px solid #000; border-top: none; }
+        .d-total-cell { padding: 15px; border-right: 2px solid #000; text-align: right; }
+
+        .juridico-detalhado { font-size: 10px; text-align: justify; margin-top: 20px; line-height: 1.4; color: #333; font-style: italic; border: 1px solid #ddd; padding: 10px; background: #fafafa; }
+
+        .s-header { text-align: right; font-weight: bold; margin-bottom: 30px; font-size: 20px; font-family: 'IBM Plex Mono'; }
+        .s-title { text-align: center; font-weight: 900; text-decoration: underline; margin-bottom: 40px; font-size: 26px; }
+        .s-text { text-align: justify; margin-bottom: 40px; font-size: 18px; line-height: 1.8; }
+        .s-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-family: 'IBM Plex Mono'; }
+        .s-dots { flex-grow: 1; border-bottom: 1px dotted #000; margin: 0 10px; position: relative; bottom: 5px; }
+
+        .auth-bar { position: absolute; bottom: 20mm; left: 20mm; right: 20mm; border: 2px solid #000; padding: 15px; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; font-size: 10px; font-family: 'IBM Plex Mono'; }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 1000;
+        }
+        .modal-box {
+            background: #0f172a; border: 1px solid #334155; padding: 30px; border-radius: 12px; width: 440px; color: white; text-align: center;
+        }
+        .modal-box h3 { color: var(--accent); margin-bottom: 10px; font-size: 18px; }
+        .modal-box p { font-size: 12px; color: #94a3b8; margin-bottom: 15px; line-height: 1.4; }
+        
+        .qr-code-img { width: 180px; height: 180px; background: #fff; padding: 10px; border-radius: 8px; margin: 0 auto 15px auto; display: block; }
+        .pix-box { background: #1e293b; padding: 10px; border-radius: 8px; border: 1px dashed var(--accent); margin-bottom: 15px; word-break: break-all; font-family: 'IBM Plex Mono'; font-size: 11px; color: #38bdf8; user-select: text; max-height: 70px; overflow-y: auto; text-align: left; }
+        
+        .btn-copy { background: #38bdf8; color: #000; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 11px; margin-bottom: 15px; width: 100%; }
+        .btn-close { background: #334155; color: white; border: none; padding: 8px; width: 100%; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 11px; }
+        
+        .status-aguardando { color: #f59e0b; font-weight: bold; font-size: 12px; margin-bottom: 15px; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+
+        @media print {
+            @page { size: A4; margin: 0; }
+            body, html { background: white !important; height: 100%; overflow: hidden; }
+            .sidebar, .modal-overlay, .watermark-overlay { display: none !important; }
+            .preview-container { margin: 0 !important; padding: 0 !important; background: white !important; display: block !important; position: static !important; }
+            .a4-page { box-shadow: none !important; margin: 0 !important; border: none !important; position: absolute !important; top: 0 !important; left: 0 !important; }
+            
+            body.print-detalhado #view-simples { display: none !important; }
+            body.print-detalhado #view-detalhado { display: block !important; }
+            body.print-simples #view-detalhado { display: none !important; }
+            body.print-simples #view-simples { display: flex !important; }
+        }
+    </style>
+</head>
+<body class="print-detalhado" oncontextmenu="return false;">
+
+<div class="sidebar">
+    <h2>PAINEL DE EMISSÃO</h2>
+    <div class="mode-selector">
+        <button id="btn-det" class="mode-btn active" onclick="setMode('detalhado')">DETALHADO</button>
+        <button id="btn-sim" class="mode-btn" onclick="setMode('simples')">SIMPLES</button>
+    </div>
+
+    <div class="group"><label>Empresa</label><input type="text" id="in-emp" value="SUA EMPRESA LTDA" oninput="update()"></div>
+    <div class="group"><label>Favorecido (Nome)</label><input type="text" id="in-nome" value="NOME DO COLABORADOR" oninput="update()"></div>
+    <div class="group"><label>CPF</label><input type="text" id="in-cpf" value="000.000.000-00" oninput="update()"></div>
+    <div class="group"><label>Referência</label><input type="text" id="in-ref" value="FEVEREIRO / 2026" oninput="update()"></div>
+    <div class="group"><label>Valor por Extenso</label><textarea id="in-extenso" oninput="update()">Mil e quinhentos reais</textarea></div>
+    
+    <hr style="border:0; border-top:1px dashed #334155; margin:15px 0;">
+    
+    <div class="group"><label>Etiqueta Provento</label><input type="text" id="label-v1" value="SALÁRIO BASE" oninput="update()"></div>
+    <div class="group"><label>Valor R$</label><input type="number" id="v1" value="1500.00" oninput="update()"></div>
+    
+    <div class="group"><label>Etiqueta Desconto</label><input type="text" id="label-d1" value="DESCONTOS E ADIANTAMENTOS" oninput="update()"></div>
+    <div class="group"><label>Valor R$</label><input type="number" id="d1" value="0.00" oninput="update()"></div>
+
+    <button class="btn-action" onclick="iniciarPagamentoPix()">🔒 Liberar e Baixar PDF (R$ 3,49)</button>
+</div>
+
+<div class="preview-container">
+    <div id="view-detalhado" class="a4-page">
+        <div id="wm-detalhado" class="watermark-overlay"><div class="watermark-text">Pré-visualização Bloqueada<br>Pague R$ 3,49 para baixar</div></div>
+        <div class="d-box">
+            <div class="d-cell" style="flex:2.5"><span class="d-label">Empresa</span><div class="d-content t-emp"></div></div>
+            <div class="d-cell" style="text-align:center; background:#f1f5f9;"><span class="d-label">Documento</span><div class="d-content">RECIBO DE PAGAMENTO</div></div>
+        </div>
+        <div class="d-box">
+            <div class="d-cell" style="flex:3.5"><span class="d-label">Favorecido</span><div class="d-content t-nome"></div></div>
+            <div class="d-cell" style="text-align:center;"><span class="d-label">Ref.</span><div class="d-content t-ref"></div></div>
+        </div>
+        <table class="d-table">
+            <thead>
+                <tr><th width="50%" align="left">DESCRIÇÃO</th><th width="25%" align="right">VENCIMENTOS</th><th width="25%" align="right">DESCONTOS</th></tr>
+            </thead>
+            <tbody id="det-rows"></tbody>
+            <tr class="d-filler"><td></td><td></td><td></td></tr>
+        </table>
+        <div class="d-totals">
+            <div class="d-total-cell"><span class="d-label">Total Bruto</span><div id="det-bruto"></div></div>
+            <div class="d-total-cell"><span class="d-label">Descontos</span><div id="det-desc"></div></div>
+            <div class="d-total-cell" style="background:#f1f5f9;"><span class="d-label">Líquido</span><div id="det-liq" style="font-size:16px; font-weight:900;"></div></div>
+        </div>
+
+        <div class="juridico-detalhado">
+            Pelo presente instrumento de quitação, o favorecido acima identificado declara ter recebido a importância líquida discriminada, referente à competência citada, outorgando à fonte pagadora plena, geral e <strong>IRREVOGÁVEL</strong> quitação sobre os referidos valores para nada mais reclamar, seja a que título for, em juízo ou fora dele, com base no Art. 320 do Código Civil.
+        </div>
+        
+        <div style="margin-top:40px; display:flex; justify-content:space-between; align-items:flex-end;">
+            <div style="font-size:12px;">Data: ____/____/_______</div>
+            <div style="border-top:2px solid #000; width:320px; text-align:center; padding-top:5px; font-size:12px; font-weight:bold;"><span class="t-nome"></span></div>
+        </div>
+        <div class="auth-bar"><div>ID: <span id="out-hash"></span> | <span id="out-now"></span></div><strong>VALIDADO</strong></div>
+    </div>
+
+    <div id="view-simples" class="a4-page">
+        <div id="wm-simples" class="watermark-overlay"><div class="watermark-text">Pré-visualização Bloqueada<br>Pague R$ 3,49 para baixar</div></div>
+        <div class="s-header">R$ <span class="t-liq-val"></span></div>
+        <div class="s-title">RECIBO DE PAGAMENTO</div>
+        <div class="s-text">
+            Recebi de <span class="t-emp" style="font-weight:bold"></span>, a importância líquida de R$ <span class="t-liq-val"></span> (<span class="t-extenso"></span>), referente ao pagamento de <span class="t-ref"></span>.
+        </div>
+        <div class="s-row"><span class="t-label-v1"></span><div class="s-dots"></div><span>R$</span><span style="width:120px; text-align:right;" class="t-v1-val"></span></div>
+        <div class="s-row"><span class="t-label-d1"></span><div class="s-dots"></div><span>R$</span><span style="width:120px; text-align:right;" class="t-d1-val"></span></div>
+        <div class="s-row" style="font-weight:bold; font-size:20px; margin-top:30px; border-top: 1px solid #000; padding-top:10px;">
+            <span>TOTAL RECEBIDO</span><div class="s-dots"></div><span>R$</span><span style="width:120px; text-align:right;" class="t-liq-val"></span>
+        </div>
+        <div style="margin-top:100px;">
+            <p>Data: ____/____/_______</p>
+            <div style="margin-top:80px;">
+                <p>Assinatura: ____________________________________________________</p>
+                <p style="margin-top:15px; font-size:18px;"><b><span class="t-nome"></span></b></p>
+                <p>CPF: <span class="t-cpf"></span></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="pix-modal" class="modal-overlay">
+    <div class="modal-box">
+        <h3>Pagamento Automático via Pix</h3>
+        <p>Escaneie o QR Code ou copie o código Pix abaixo para liberar o recibo instantaneamente:</p>
+        
+        <div class="status-aguardando" id="status-pagamento">⏳ Aguardando pagamento...</div>
+
+        <img id="qr-img" class="qr-code-img" src="" alt="QR Code Pix">
+        <div class="pix-box" id="qr-text">Gerando Pix...</div>
+        
+        <button class="btn-copy" onclick="copiarPixCode()">Copiar Código Pix Copia e Cola</button>
+        <button class="btn-close" onclick="fecharModal()">Cancelar</button>
+    </div>
+</div>
+
+<script>
+    // Na Vercel, usamos a rota relativa /api/pagamento que serve tanto para criar quanto verificar
+    const API_URL = "/api/pagamento";
+
+    let pago = false;
+    let paymentId = null;
+    let checkInterval = null;
+
+    function setMode(mode) {
+        document.body.className = 'print-' + mode;
+        document.getElementById('btn-det').classList.toggle('active', mode === 'detalhado');
+        document.getElementById('btn-sim').classList.toggle('active', mode === 'simples');
+        document.getElementById('view-detalhado').style.display = (mode === 'detalhado') ? 'block' : 'none';
+        document.getElementById('view-simples').style.display = (mode === 'simples') ? 'flex' : 'none';
+    }
+
+    function update() {
+        const fmt = (v) => parseFloat(v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2});
+        const v1 = parseFloat(document.getElementById('v1').value || 0);
+        const d1 = parseFloat(document.getElementById('d1').value || 0);
+        const labelV1 = document.getElementById('label-v1').value.toUpperCase();
+        const labelD1 = document.getElementById('label-d1').value.toUpperCase();
+        const liq = v1 - d1;
+
+        document.querySelectorAll('.t-emp').forEach(e => e.innerText = document.getElementById('in-emp').value);
+        document.querySelectorAll('.t-nome').forEach(e => e.innerText = document.getElementById('in-nome').value);
+        document.querySelectorAll('.t-ref').forEach(e => e.innerText = document.getElementById('in-ref').value);
+        document.querySelectorAll('.t-extenso').forEach(e => e.innerText = document.getElementById('in-extenso').value);
+        document.querySelectorAll('.t-cpf').forEach(e => e.innerText = document.getElementById('in-cpf').value);
+        document.querySelectorAll('.t-liq-val').forEach(e => e.innerText = fmt(liq));
+        document.querySelectorAll('.t-v1-val').forEach(e => e.innerText = fmt(v1));
+        document.querySelectorAll('.t-d1-val').forEach(e => e.innerText = fmt(d1));
+        document.querySelectorAll('.t-label-v1').forEach(e => e.innerText = labelV1);
+        document.querySelectorAll('.t-label-d1').forEach(e => e.innerText = labelD1);
+
+        document.getElementById('det-rows').innerHTML = `
+            <tr><td>${labelV1}</td><td align="right">${fmt(v1)}</td><td align="right">---</td></tr>
+            <tr><td>${labelD1}</td><td align="right">---</td><td align="right">${fmt(d1)}</td></tr>`;
+        
+        document.getElementById('det-bruto').innerText = fmt(v1);
+        document.getElementById('det-desc').innerText = fmt(d1);
+        document.getElementById('det-liq').innerText = "R$ " + fmt(liq);
+
+        if(!window.h) window.h = "AUTH-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+        document.getElementById('out-hash').innerText = window.h;
+        document.getElementById('out-now').innerText = new Date().toLocaleDateString('pt-BR');
+    }
+
+    async function iniciarPagamentoPix() {
+        if (pago) {
+            liberarDownload();
+            return;
+        }
+
+        document.getElementById('pix-modal').style.display = 'flex';
+        document.getElementById('status-pagamento').innerText = "⏳ Gerando Pix de R$ 3,49...";
+        document.getElementById('qr-text').innerText = "Aguarde, conectando ao servidor seguro...";
+
+        try {
+            const response = await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "criar" })
+            });
+
+            const data = await response.json();
+
+            if (data && data.id) {
+                paymentId = data.id;
+                document.getElementById('qr-img').src = `data:image/png;base64,${data.qr_code_base64}`;
+                document.getElementById('qr-text').innerText = data.qr_code;
+                document.getElementById('status-pagamento').innerText = "⏳ Aguardando confirmação do pagamento...";
+
+                iniciarVerificacaoPagamento();
+            } else {
+                alert("Erro ao gerar o Pix no servidor.");
+                fecharModal();
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Erro de conexão com o servidor.");
+            fecharModal();
+        }
+    }
+
+    function iniciarVerificacaoPagamento() {
+        if (checkInterval) clearInterval(checkInterval);
+
+        checkInterval = setInterval(async () => {
+            if (!paymentId || pago) return;
+
+            try {
+                const response = await fetch(`${API_URL}?action=verificar&id=${paymentId}`);
+                const data = await response.json();
+
+                if (data && data.status === "approved") {
+                    pago = true;
+                    clearInterval(checkInterval);
+                    document.getElementById('status-pagamento').innerHTML = "✅ Pagamento Aprovado com Sucesso!";
+                    setTimeout(() => {
+                        fecharModal();
+                        liberarDownload();
+                    }, 1500);
+                }
+            } catch (e) {
+                console.log("Verificando status...");
+            }
+        }, 4000);
+    }
+
+    function copiarPixCode() {
+        const texto = document.getElementById('qr-text').innerText;
+        navigator.clipboard.writeText(texto).then(() => {
+            alert("Código Pix Copia e Cola copiado com sucesso!");
+        });
+    }
+
+    function liberarDownload() {
+        document.getElementById('wm-detalhado').style.display = 'none';
+        document.getElementById('wm-simples').style.display = 'none';
+        window.print();
+    }
+
+    function fecharModal() {
+        if (checkInterval) clearInterval(checkInterval);
+        document.getElementById('pix-modal').style.display = 'none';
+    }
+
+    update();
+    setMode('detalhado');
+</script>
+</body>
+</html>
