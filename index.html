@@ -196,7 +196,6 @@
 </div>
 
 <script>
-    // Na Vercel, usamos a rota relativa /api/pagamento que serve tanto para criar quanto verificar
     const API_URL = "/api/pagamento";
 
     let pago = false;
@@ -257,12 +256,12 @@
             const response = await fetch(API_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "criar" })
+                body: JSON.stringify({})
             });
 
             const data = await response.json();
 
-            if (data && data.id) {
+            if (response.ok && data && data.id) {
                 paymentId = data.id;
                 document.getElementById('qr-img').src = `data:image/png;base64,${data.qr_code_base64}`;
                 document.getElementById('qr-text').innerText = data.qr_code;
@@ -270,7 +269,8 @@
 
                 iniciarVerificacaoPagamento();
             } else {
-                alert("Erro ao gerar o Pix no servidor.");
+                console.error("Erro retornado pela API:", data);
+                alert("Erro ao gerar o Pix no servidor: " + (data.error || "Desconhecido"));
                 fecharModal();
             }
         } catch (error) {
